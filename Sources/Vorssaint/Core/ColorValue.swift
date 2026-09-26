@@ -5,8 +5,9 @@ import Foundation
 
 /// A color read from text that is only a color value. The accepted forms are
 /// the CSS ones designers copy and the ones the color picker writes: `#RGB`,
-/// `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, `rgb()`, `rgba()`, `hsl()` and `hsla()`.
-/// The value must be the whole entry; a color inside a longer text is not one, and a bare `RRGGBB` would
+/// `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, `rgb()`, `rgba()`, `hsl()`, `hsla()` and
+/// SwiftUI's `Color(red:green:blue:opacity:)`. The value must be the whole
+/// entry; a color inside a longer text is not one, and a bare `RRGGBB` would
 /// also match plain numbers and hashes.
 struct ColorValue: Equatable {
     let red: Double
@@ -16,7 +17,7 @@ struct ColorValue: Equatable {
 
     /// Longer than any accepted form with generous spacing; the cap keeps a
     /// render from trimming or scanning a large entry.
-    static let maxLength = 64
+    static let maxLength = 96
 
     init(red: Double, green: Double, blue: Double, alpha: Double = 1) {
         self.red = red
@@ -34,6 +35,8 @@ struct ColorValue: Equatable {
             self.init(rgbArguments: arguments)
         } else if let arguments = Self.arguments(of: value, names: ["hsla", "hsl"]) {
             self.init(hslArguments: arguments)
+        } else if let arguments = Self.arguments(of: value, names: ["color"]) {
+            self.init(swiftUIArguments: arguments)
         } else {
             return nil
         }
@@ -69,6 +72,22 @@ struct ColorValue: Equatable {
         }
         guard let alpha = Self.alpha(rgbArguments.dropFirst(3).first) else { return nil }
         self.init(red: channels[0], green: channels[1], blue: channels[2], alpha: alpha)
+    }
+
+    /// `["red:", "0.2", "green:", "0.4", "blue:", "0.6"]`, optionally
+    /// followed by `"opacity:", "0.5"`.
+    private init?(swiftUIArguments: [String]) {
+        let labels = ["red:", "green:", "blue:", "opacity:"]
+        guard [6, 8].contains(swiftUIArguments.count) else { return nil }
+        var components: [Double] = []
+        for index in stride(from: 0, to: swiftUIArguments.count, by: 2) {
+            guard swiftUIArguments[index] == labels[index / 2],
+                  let value = Self.number(swiftUIArguments[index + 1]), (0...1).contains(value)
+            else { return nil }
+            components.append(value)
+        }
+        self.init(red: components[0], green: components[1], blue: components[2],
+                  alpha: components.count == 4 ? components[3] : 1)
     }
 
     private init?(hslArguments: [String]) {
@@ -154,36 +173,46 @@ extension ColorValue {
     /// out of range are clamped so extended-gamut samples never produce
     /// invalid strings. `bareHex` drops the leading # (issue #168: some design
     /// tools reject pasted values that carry it); it only affects `.hex`.
+    /// A non-nil `alpha` writes the alpha form.
     static func string(red: Double,
                        green: Double,
                        blue: Double,
+                       alpha: Double? = nil,
                        format: ColorCopyFormat,
                        bareHex: Bool = false) -> String {
         let r = min(max(red, 0), 1)
         let g = min(max(green, 0), 1)
         let b = min(max(blue, 0), 1)
+        let a = alpha.map { min(max($0, 0), 1) }
+        let alphaText = a.map { String(format: "%g", locale: Locale(identifier: "en_US_POSIX"),
+                                       ($0 * 100).rounded() / 100) }
         switch format {
         case .hex:
-            return String(format: bareHex ? "%02X%02X%02X" : "#%02X%02X%02X",
-                          Int((r * 255).rounded()),
-                          Int((g * 255).rounded()),
-                          Int((b * 255).rounded()))
+            let hex = String(format: bareHex ? "%02X%02X%02X" : "#%02X%02X%02X",
+                             Int((r * 255).rounded()),
+                             Int((g * 255).rounded()),
+                             Int((b * 255).rounded()))
+            return a.map { hex + String(format: "%02X", Int(($0 * 255).rounded())) } ?? hex
         case .rgb:
-            return String(format: "rgb(%d, %d, %d)",
-                          Int((r * 255).rounded()),
-                          Int((g * 255).rounded()),
-                          Int((b * 255).rounded()))
+            let channels = String(format: "%d, %d, %d",
+                                  Int((r * 255).rounded()),
+                                  Int((g * 255).rounded()),
+                                  Int((b * 255).rounded()))
+            return alphaText.map { "rgba(\(channels), \($0))" } ?? "rgb(\(channels))"
         case .hsl:
             let (h, s, l) = hsl(red: r, green: g, blue: b)
-            return String(format: "hsl(%d, %d%%, %d%%)",
-                          Int(h.rounded()),
-                          Int((s * 100).rounded()),
-                          Int((l * 100).rounded()))
+            let channels = String(format: "%d, %d%%, %d%%",
+                                  Int(h.rounded()),
+                                  Int((s * 100).rounded()),
+                                  Int((l * 100).rounded()))
+            return alphaText.map { "hsla(\(channels), \($0))" } ?? "hsl(\(channels))"
         case .swiftui:
             // Source code, not prose: a comma here would paste something that
             // does not compile, whatever region the reader is in.
-            return String(format: "Color(red: %.3f, green: %.3f, blue: %.3f)",
-                          locale: Locale(identifier: "en_US_POSIX"), r, g, b)
+            let posix = Locale(identifier: "en_US_POSIX")
+            let rgb = String(format: "red: %.3f, green: %.3f, blue: %.3f", locale: posix, r, g, b)
+            return a.map { "Color(\(rgb), opacity: \(String(format: "%.3f", locale: posix, $0)))" }
+                ?? "Color(\(rgb))"
         }
     }
 

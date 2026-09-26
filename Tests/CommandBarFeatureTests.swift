@@ -725,6 +725,39 @@ enum CommandBarFeatureTests {
                 && lowerLeft == CGPoint(x: -1424, y: 16),
                "the command bar stays fully inside a screen on both axes")
 
+        // MARK: Command bar color conversion
+
+        for (input, expected) in [
+            ("#a2b3b4 to rgb", "rgb(162, 179, 180)"),
+            ("#A2B3B4 in HSL", "hsl(183, 11%, 67%)"),
+            ("rgb(0, 188, 125) to hex", "#00BC7D"),
+            ("rgb(255 0 0) as hsl", "hsl(0, 100%, 50%)"),
+            ("hsl(120, 100%, 25%) to rgb", "rgb(0, 128, 0)"),
+            ("#fff to rgba", "rgba(255, 255, 255, 1)"),
+            ("#fff to hsla", "hsla(0, 0%, 100%, 1)"),
+            ("rgba(255, 0, 0, 0.5) to hex", "#FF000080"),
+            ("#00000080 to rgb", "rgba(0, 0, 0, 0.5)"),
+            ("hsla(0, 100%, 50%, 25%) to hsl", "hsla(0, 100%, 50%, 0.25)"),
+            ("#f80 nach rgb", "rgb(255, 136, 0)"),
+            ("#336699 to swift", "Color(red: 0.200, green: 0.400, blue: 0.600)"),
+            ("rgba(255, 0, 0, 0.5) to SwiftUI", "Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500)"),
+            ("Color(red: 0.200, green: 0.400, blue: 0.600) to hex", "#336699"),
+            ("Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500) to rgb", "rgba(255, 0, 0, 0.5)"),
+        ] {
+            suite.expect(CommandBarColors.convert(input)?.formatted == expected,
+                         "\(input) converts to \(expected), got \(String(describing: CommandBarColors.convert(input)?.formatted))")
+        }
+        for input in ["#a2b3b4", "#a2b3b4 to", "#a2b3b4 rgb", "#a2b3b4 to cmyk", "a2b3b4 to rgb",
+                      "brand #a2b3b4 to rgb", "rgb(300, 0, 0) to hex", "5 km to mi",
+                      String(repeating: " ", count: 110) + "#fff to rgb"] {
+            suite.expect(CommandBarColors.convert(input) == nil,
+                         "\(input.debugDescription) is not a color conversion")
+        }
+        suite.expect(ColorValue.string(red: 1, green: 0, blue: 0, format: .hex) == "#FF0000"
+                     && ColorValue.string(red: 1, green: 0, blue: 0, alpha: 0.5, format: .swiftui)
+                        == "Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500)",
+                     "alpha is written only when asked for")
+
         // MARK: Command bar unit conversion
 
         func units(_ input: String) -> String? {
