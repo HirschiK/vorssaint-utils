@@ -117,6 +117,12 @@ enum ClipboardFeatureTests {
         expectColor(ColorValue.string(red: 0.2, green: 0.4, blue: 0.6, format: .swiftui),
                     ColorValue(red: 0.2, green: 0.4, blue: 0.6),
                     "SwiftUI code written by the color picker reads back as its color")
+        expectColor("Color(red:0.2,green:0.4,blue:0.6)",
+                    ColorValue(red: 0.2, green: 0.4, blue: 0.6),
+                    "compact SwiftUI code without spaces reads as a color")
+        expectColor("Color(red:1, green:0,blue: 0,opacity:0.5)",
+                    ColorValue(red: 1, green: 0, blue: 0, alpha: 0.5),
+                    "SwiftUI labels read with any spacing after the colon")
         expectColor("Color(red: 1, green: 0, blue: 0, opacity: 0.5)",
                     ColorValue(red: 1, green: 0, blue: 0, alpha: 0.5),
                     "SwiftUI opacity reads as alpha")
@@ -124,7 +130,8 @@ enum ClipboardFeatureTests {
                     ColorValue(red: 0.251, green: 0.502, blue: 0.753, alpha: 0.5),
                     "full precision SwiftUI code from Xcode reads as a color")
         for text in ["Color(red: 1, green: 0)", "Color(green: 0, red: 1, blue: 0)",
-                     "Color(red: 2, green: 0, blue: 0)", "Color(.red)", "00BC7D", "#12345", "#GGGGGG", "#00BC7D is the brand green", "color: #00BC7D",
+                     "Color(red: 2, green: 0, blue: 0)", "Color(.red)", "Color(red:1,green:0,blue:0,)",
+                     "Color(red 1, green 0, blue 0)", "00BC7D", "#12345", "#GGGGGG", "#00BC7D is the brand green", "color: #00BC7D",
                      "rgb(256, 0, 0)", "rgb(0, 0)", "rgb(0, 0, 0, 2)", "hsl(0, 50, 50%)",
                      "rgb(nan, 0, 0)", "#", "", String(repeating: " ", count: 100) + "#fff"] {
             expectColor(text, nil, "\(text.debugDescription) is not a lone color value")

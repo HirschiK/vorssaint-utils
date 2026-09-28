@@ -35,8 +35,8 @@ struct ColorValue: Equatable {
             self.init(rgbArguments: arguments)
         } else if let arguments = Self.arguments(of: value, names: ["hsla", "hsl"]) {
             self.init(hslArguments: arguments)
-        } else if let arguments = Self.arguments(of: value, names: ["color"]) {
-            self.init(swiftUIArguments: arguments)
+        } else if value.hasPrefix("color("), value.hasSuffix(")") {
+            self.init(swiftUIArguments: value.dropFirst(6).dropLast())
         } else {
             return nil
         }
@@ -74,15 +74,19 @@ struct ColorValue: Equatable {
         self.init(red: channels[0], green: channels[1], blue: channels[2], alpha: alpha)
     }
 
-    /// `["red:", "0.2", "green:", "0.4", "blue:", "0.6"]`, optionally
-    /// followed by `"opacity:", "0.5"`.
-    private init?(swiftUIArguments: [String]) {
-        let labels = ["red:", "green:", "blue:", "opacity:"]
-        guard [6, 8].contains(swiftUIArguments.count) else { return nil }
+    /// `red: 0.2, green: 0.4, blue: 0.6`, optionally followed by
+    /// `opacity: 0.5`, with or without spaces around the labels.
+    private init?(swiftUIArguments: Substring) {
+        let labels = ["red", "green", "blue", "opacity"]
+        let pairs = swiftUIArguments.split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false) }
+        guard (3...4).contains(pairs.count) else { return nil }
         var components: [Double] = []
-        for index in stride(from: 0, to: swiftUIArguments.count, by: 2) {
-            guard swiftUIArguments[index] == labels[index / 2],
-                  let value = Self.number(swiftUIArguments[index + 1]), (0...1).contains(value)
+        for (label, pair) in zip(labels, pairs) {
+            guard pair.count == 2,
+                  pair[0].trimmingCharacters(in: .whitespacesAndNewlines) == label,
+                  let value = Self.number(pair[1].trimmingCharacters(in: .whitespacesAndNewlines)),
+                  (0...1).contains(value)
             else { return nil }
             components.append(value)
         }
@@ -184,8 +188,9 @@ extension ColorValue {
         let g = min(max(green, 0), 1)
         let b = min(max(blue, 0), 1)
         let a = alpha.map { min(max($0, 0), 1) }
+        // Three decimals are the fewest that bring every 8-bit alpha back.
         let alphaText = a.map { String(format: "%g", locale: Locale(identifier: "en_US_POSIX"),
-                                       ($0 * 100).rounded() / 100) }
+                                       ($0 * 1000).rounded() / 1000) }
         switch format {
         case .hex:
             let hex = String(format: bareHex ? "%02X%02X%02X" : "#%02X%02X%02X",

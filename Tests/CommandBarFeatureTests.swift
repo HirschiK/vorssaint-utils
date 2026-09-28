@@ -736,13 +736,16 @@ enum CommandBarFeatureTests {
             ("#fff to rgba", "rgba(255, 255, 255, 1)"),
             ("#fff to hsla", "hsla(0, 0%, 100%, 1)"),
             ("rgba(255, 0, 0, 0.5) to hex", "#FF000080"),
-            ("#00000080 to rgb", "rgba(0, 0, 0, 0.5)"),
+            ("#00000080 to rgb", "rgba(0, 0, 0, 0.502)"),
             ("hsla(0, 100%, 50%, 25%) to hsl", "hsla(0, 100%, 50%, 0.25)"),
             ("#f80 nach rgb", "rgb(255, 136, 0)"),
             ("#336699 to swift", "Color(red: 0.200, green: 0.400, blue: 0.600)"),
             ("rgba(255, 0, 0, 0.5) to SwiftUI", "Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500)"),
             ("Color(red: 0.200, green: 0.400, blue: 0.600) to hex", "#336699"),
             ("Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500) to rgb", "rgba(255, 0, 0, 0.5)"),
+            ("Color(red:0.2,green:0.4,blue:0.6) to hex", "#336699"),
+            ("#00000001 to rgba", "rgba(0, 0, 0, 0.004)"),
+            ("#000000fe to rgba", "rgba(0, 0, 0, 0.996)"),
         ] {
             suite.expect(CommandBarColors.convert(input)?.formatted == expected,
                          "\(input) converts to \(expected), got \(String(describing: CommandBarColors.convert(input)?.formatted))")
@@ -753,6 +756,18 @@ enum CommandBarFeatureTests {
             suite.expect(CommandBarColors.convert(input) == nil,
                          "\(input.debugDescription) is not a color conversion")
         }
+        let alphaLosses = (0...255).flatMap { byte in
+            let hex = String(format: "#336699%02X", byte)
+            return ["rgba", "hsla", "swift"].compactMap { target -> String? in
+                let there = CommandBarColors.convert(hex + " to " + target)?.formatted
+                let back = there.flatMap { CommandBarColors.convert($0 + " to hex")?.formatted }
+                // An opaque color comes back without the alpha pair.
+                let expected = byte == 255 ? "#336699" : hex
+                return back == expected ? nil : "\(hex) → \(there ?? "nil") → \(back ?? "nil")"
+            }
+        }
+        suite.expect(alphaLosses.isEmpty,
+                     "every 8-bit alpha survives a trip through rgba, hsla and SwiftUI back to hex: \(alphaLosses.prefix(4))")
         suite.expect(ColorValue.string(red: 1, green: 0, blue: 0, format: .hex) == "#FF0000"
                      && ColorValue.string(red: 1, green: 0, blue: 0, alpha: 0.5, format: .swiftui)
                         == "Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500)",
