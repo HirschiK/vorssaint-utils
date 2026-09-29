@@ -784,6 +784,12 @@ enum CommandBarFeatureTests {
                      && ColorValue.string(red: 1, green: 0, blue: 0, alpha: 0.5, format: .swiftui)
                         == "Color(red: 1.000, green: 0.000, blue: 0.000, opacity: 0.500)",
                      "alpha is written only when asked for")
+        suite.expect(CommandBarSearch.colorPreviewIndex(rowTitles: [], query: "#2139") == 0
+                     && CommandBarSearch.colorPreviewIndex(rowTitles: ["Safari", "Notes"], query: "#cafe") == 0,
+                     "a color typed on its own leads when nothing on the list spells it")
+        suite.expect(CommandBarSearch.colorPreviewIndex(rowTitles: ["Fix #2139 crash"], query: "#2139") == 1
+                     && CommandBarSearch.colorPreviewIndex(rowTitles: ["#CAFE"], query: "#cafe") == 1,
+                     "a row that spells the typed color keeps Return, the swatch sits under it")
 
         // MARK: Command bar unit conversion
 
